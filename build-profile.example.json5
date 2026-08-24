@@ -1,0 +1,56 @@
+{
+  "app": {
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compileSdkVersion": 12,
+        "compatibleSdkVersion": 12,
+        "targetSdkVersion": 12,
+        "runtimeOS": "OpenHarmony",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "material": {
+          "certpath": "<LOCAL_CERTIFICATE_FILE>",
+          "keyAlias": "debugKey",
+          "keyPassword": "<LOCAL_KEY_PASSWORD>",
+          "profile": "<LOCAL_PROFILE_FILE>",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "<LOCAL_KEYSTORE_FILE>",
+          "storePassword": "<LOCAL_STORE_PASSWORD>"
+        }
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

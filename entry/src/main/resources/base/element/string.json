@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "人脸识别"
+    },
+    {
+      "name": "camera_reason",
+      "value": "reason"
+    },
+    {
+      "name": "media_reason",
+      "value": "Need to access media library to save photos"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+/node_modules
+/oh_modules
+/local.properties
+/build-profile.json5
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# Local logs and temporary transfer files
+*.log
+/log.txt
+*.tmp
+*.part*
+/tmp/
+
+# Local OpenHarmony SDK and signing materials
+/openharmony_sdk/
+*.p12
+*.p7b
+*.cer
+*.pem
+*.key
+
+# Editor and operating-system files
+/.vscode/
+.DS_Store
+Thumbs.db

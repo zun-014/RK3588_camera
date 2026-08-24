@@ -1,0 +1,244 @@
+// @ts-nocheck
+/*
+ * Copyright (c) 2022-2023 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import mediaLibrary from '@ohos.multimedia.mediaLibrary'
+import Logger from './Logger'
+import fs from '@ohos.file.fs';
+import environment from '@ohos.file.environment';
+import fileuri from "@ohos.file.fileuri";
+
+
+export default class MediaUtils {
+  private tag: string = 'MediaUtils'
+  private mediaTest: mediaLibrary.MediaLibrary = undefined
+  private static instance: MediaUtils = undefined
+
+  public static getInstance(context: any) {
+    if (this.instance === undefined) {
+      this.instance = new MediaUtils(context)
+    }
+    return this.instance
+  }
+
+  constructor(context: any) {
+    this.mediaTest = mediaLibrary.getMediaLibrary(context)
+  }
+
+  async createAndGetUri(mediaType: number) {
+    let info = this.getInfoFromType(mediaType)
+    let dateTimeUtil = new DateTimeUtil()
+    let name = `${dateTimeUtil.getDate()}_${dateTimeUtil.getTime()}`
+    let displayName = `${info.prefix}${name}${info.suffix}`
+    Logger.info(this.tag, `displayName = ${displayName},mediaType = ${mediaType}`)
+    let publicPath = await this.createAndGetDir(mediaType)
+    //this code will create dir.
+    return await this.mediaTest.createAsset(mediaType, displayName, publicPath)
+  }
+
+  async createAndGetDir(mediaType: number) {
+    let info = this.getInfoFromType(mediaType)
+    let publicPath = await this.mediaTest.getPublicDirectory(info.directory)
+    //let publicPath = await this.mediaTest.getPublicDirectory(mediaLibrary.DirectoryType.DIR_IMAGE)
+    //Add by smdt,change directory,default is /Picture/, change to /Picture/OsTools/CameraTest/
+    publicPath = publicPath + CommonConstants.DIRECTORY_CAMERA_TEST_PHOTO_SAVE
+    // if (!fs.access(publicPath)) {
+    //   Logger.info(this.tag, publicPath + ' no exit.')
+    //   fs.mkdir(publicPath)
+    // }
+    Logger.info(this.tag, `publicPath = ${publicPath}`)
+    try {
+      let getStorageDataDir = await environment.getStorageDataDir()
+      Logger.info(this.tag, "getStorageDataDir:" + getStorageDataDir)
+      let getUserDataDir = await environment.getUserDataDir()
+      Logger.info(this.tag, "getUserDataDir:" + getUserDataDir)
+    } catch (error) {
+      Logger.error(this.tag, "getStorageDataDir or getUserDataDir error:" + error)
+    }
+
+    return publicPath
+  }
+
+  async rmDir(dirPath: string) {
+
+    let finalDirPath = ''
+    try {
+      if (dirPath == null || dirPath == '') return
+
+      finalDirPath = CommonConstants.DIRECTORY_USER_DATA_DIR + dirPath
+      Logger.info(this.tag, "finalDirPath:" + finalDirPath)
+
+      let uri = fileuri.getUriFromPath(finalDirPath);
+      Logger.info(this.tag, "finalDirPath fileuri:" + uri)
+
+      let fsAccessSync = fs.accessSync(finalDirPath)
+      Logger.info(this.tag, "fsAccessSync:" + fsAccessSync + ",fsAccessSync typeof:" + typeof fsAccessSync)
+
+      if (!fs.accessSync(finalDirPath)) {
+        Logger.info(this.tag, "finalDirPath no exit. " + finalDirPath)
+      }
+
+      fs.rmdir(finalDirPath).then(() => {
+        Logger.info(this.tag, "rmdir succeed");
+      }).catch((err) => {
+        Logger.error(this.tag, "rmdir failed with error message: " + err.message + ", error code: " + err.code);
+      });
+    } catch (error) {
+      Logger.error(this.tag, "rmDir error:" + error)
+    }
+  }
+
+  async queryFile(dataUri: any) {
+    let fileKeyObj = mediaLibrary.FileKey
+    if (dataUri !== undefined) {
+      let args = dataUri.id.toString()
+      let fetchOp = {
+        selections: `${fileKeyObj.ID}=?`,
+        selectionArgs: [args],
+      }
+      const fetchFileResult = await this.mediaTest.getFileAssets(fetchOp)
+      Logger.info(this.tag, `fetchFileResult.getCount() = ${fetchFileResult.getCount()}`)
+      const fileAsset = await fetchFileResult.getAllObject()
+      return fileAsset[0]
+    }
+  }
+
+  async getFdPath(fileAsset: any) {
+    let fd = await fileAsset.open('Rw')
+    Logger.info(this.tag, `fd = ${fd}`)
+    return fd
+  }
+
+  async createFile(mediaType: number) {
+    let dataUri = await this.createAndGetUri(mediaType)
+    if (dataUri) {
+      let fileAsset = await this.queryFile(dataUri)
+      if (fileAsset) {
+        let fd = await this.getFdPath(fileAsset)
+        return fd
+      }
+    }
+  }
+
+  async getFileAssetsFromType(mediaType: number) {
+    Logger.info(this.tag, `getFileAssetsFromType,mediaType = ${mediaType}`);
+    let fileKeyObj = mediaLibrary.FileKey;
+    let fileAssets = [];
+
+    try {
+      let fetchOp = {
+        selections: `${fileKeyObj.MEDIA_TYPE}=?`,
+        selectionArgs: [`${mediaType}`],
+      };
+      const fetchFileResult = await this.mediaTest.getFileAssets(fetchOp);
+      Logger.info(this.tag, `getFileAssetsFromType,fetchFileResult.count = ${fetchFileResult.getCount()}`);
+      if (fetchFileResult.getCount() > 0) {
+        fileAssets = await fetchFileResult.getAllObject();
+      }
+    } catch (err) {
+      console.info(`LSQ: err ${JSON.stringify(err)}`);
+    }
+    return fileAssets
+  }
+
+  async getAlbums() {
+    Logger.info(this.tag, 'getAlbums begin')
+    let albums = []
+    const [ files, images, videos, audios ] = await Promise.all([
+    this.getFileAssetsFromType(mediaLibrary.MediaType.FILE),
+    this.getFileAssetsFromType(mediaLibrary.MediaType.IMAGE),
+    this.getFileAssetsFromType(mediaLibrary.MediaType.VIDEO),
+    this.getFileAssetsFromType(mediaLibrary.MediaType.AUDIO)
+    ])
+    albums.push({
+      albumName: 'Documents', count: files.length, mediaType: mediaLibrary.MediaType.FILE
+    })
+    albums.push({
+      albumName: 'Pictures', count: images.length, mediaType: mediaLibrary.MediaType.IMAGE
+    })
+    albums.push({
+      albumName: 'Videos', count: videos.length, mediaType: mediaLibrary.MediaType.VIDEO
+    })
+    albums.push({
+      albumName: 'Audios', count: audios.length, mediaType: mediaLibrary.MediaType.AUDIO
+    })
+    return albums
+  }
+
+  deleteFile(media: any) {
+    let uri = media.uri
+    Logger.info(this.tag, `deleteFile,uri = ${uri}`)
+    return this.mediaTest.deleteAsset(uri)
+  }
+
+  onDateChange(callback: () => void) {
+    this.mediaTest.on('albumChange', () => {
+      Logger.info(this.tag, 'albumChange called')
+      callback()
+    })
+    this.mediaTest.on('imageChange', () => {
+      Logger.info(this.tag, 'imageChange called')
+      callback()
+    })
+    this.mediaTest.on('audioChange', () => {
+      Logger.info(this.tag, 'audioChange called')
+      callback()
+    })
+    this.mediaTest.on('videoChange', () => {
+      Logger.info(this.tag, 'videoChange called')
+      callback()
+    })
+    this.mediaTest.on('fileChange', () => {
+      Logger.info(this.tag, 'fileChange called')
+      callback()
+    })
+  }
+
+  offDateChange() {
+    this.mediaTest.off('albumChange')
+    this.mediaTest.off('imageChange')
+    this.mediaTest.off('audioChange')
+    this.mediaTest.off('videoChange')
+    this.mediaTest.off('fileChange')
+  }
+
+  getInfoFromType(mediaType: number) {
+    let result = {
+      prefix: '', suffix: '', directory: 0
+    }
+    switch (mediaType) {
+      case mediaLibrary.MediaType.FILE:
+        result.prefix = 'FILE_'
+        result.suffix = '.txt'
+        result.directory = mediaLibrary.DirectoryType.DIR_DOCUMENTS
+        break
+      case mediaLibrary.MediaType.IMAGE:
+        result.prefix = 'IMG_'
+        result.suffix = '.jpg'
+        result.directory = mediaLibrary.DirectoryType.DIR_IMAGE
+        break
+      case mediaLibrary.MediaType.VIDEO:
+        result.prefix = 'VID_'
+        result.suffix = '.mp4'
+        result.directory = mediaLibrary.DirectoryType.DIR_VIDEO
+        break
+      case mediaLibrary.MediaType.AUDIO:
+        result.prefix = 'AUD_'
+        result.suffix = '.wav'
+        result.directory = mediaLibrary.DirectoryType.DIR_AUDIO
+        break
+    }
+    return result
+  }
+}
